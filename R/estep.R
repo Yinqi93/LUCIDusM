@@ -1,5 +1,3 @@
-# note: this is a special case for 2 omics data
-
 # parameters
 # 1 - number of latent cluster: K
 # 2 - G -> X coef: Beta
@@ -24,24 +22,24 @@ f_XtoZ <- function(Z, Mu_matrix, Sigma_matrix) {
   K <- ncol(Mu_matrix)
   XtoZ <- matrix(rep(0, N * K), nrow = N)
   for (i in 1:K) {
-    XtoZ[, i] <- mclust::dmvnorm(data = Z, 
-                                 mean = Mu_matrix[, i], 
-                                 sigma = Sigma_matrix[, , i], 
+    XtoZ[, i] <- mclust::dmvnorm(data = Z,
+                                 mean = Mu_matrix[, i],
+                                 sigma = Sigma_matrix[, , i],
                                  log = TRUE)
   }
   return(XtoZ)
 }
 
-# calculate f(Y|X) 
+# calculate f(Y|X)
 f_XtoY <- function(Y, Delta, family) {
-  
+
   if(!is.matrix(Y)) {
     stop("Y should be a matrix")
   }
   N <- nrow(Y)
   K <- Delta$K
   XtoY <- array(rep(0, prod(K) * N), dim = c(K, N))
-  
+
   # if the outcome is continuous
   if(family == "gaussian") {
     # if 2 omics layer
@@ -54,7 +52,7 @@ f_XtoY <- function(Y, Delta, family) {
       }
     }
   }
-  
+
   # if the outcome is binary
   if(family == "binomial") {
     # if 2 omics layer
@@ -77,6 +75,7 @@ Estep <- function(G, Z, Y, Beta, Mu, Sigma, Delta, family, useY) {
   K <- Delta$K
   res <- array(rep(0, prod(K * N)),
                dim = c(K, N))
+
   # E step for 2 omics data
   if(length(K) == 2) {
     f1 <- lapply(1:2, function(i) {
@@ -88,7 +87,7 @@ Estep <- function(G, Z, Y, Beta, Mu, Sigma, Delta, family, useY) {
     if(useY) {
       f3 <- f_XtoY(Y = Y, Delta = Delta, family = family)
     }
-    
+
     for(i in 1:K[1]) {
       for(j in 1:K[2]) {
         res[i, j, ] <- f1[[1]][, i] + f1[[2]][, j] + f2[[1]][, i] + f2[[2]][, j]
@@ -98,19 +97,39 @@ Estep <- function(G, Z, Y, Beta, Mu, Sigma, Delta, family, useY) {
       }
     }
   }
-  
+
   # E step for 3 omics data
   if(length(K) == 3) {
-    
+    f1 <- lapply(1:3, function(i) {
+      f_GtoX(G = G, Beta_matrix = Beta[[i]])
+    })
+    f2 <- lapply(1:3, function(i) {
+      f_XtoZ(Z = Z[[i]], Mu_matrix = Mu[[i]], Sigma_matrix = Sigma[[i]])
+    })
+    if(useY) {
+      f3 <- f_XtoY(Y = Y, Delta = Delta, family = family)
+    }
+
+    for(i in 1:K[1]) {
+      for(j in 1:K[2]) {
+        for(k in 1:K[3]) {
+          res[i, j, k, ] <- f1[[1]][, i] + f1[[2]][, j] + f1[[3]][, k] + f2[[1]][, i] + f2[[2]][, j] + f2[[3]][, k]
+          if(useY) {
+            res[i, j, k, ] <- res[i, j, k, ] + f3[i, j, k, ]
+          }
+        }
+      }
+    }
   }
-  
+
   return(res)
 }
 
 
 
 Estep_to_r <- function(Estep_array, K, N) {
-  # 2 omics data
+
+  # E step for 2 omics layers
   if(length(K) == 2) {
     for(i in 1:N) {
       a <- as.vector(Estep_array[, , i])
@@ -118,6 +137,16 @@ Estep_to_r <- function(Estep_array, K, N) {
       Estep_array[, , i] <- array(r, dim = K)
     }
   }
+
+  # E step for 3 omics layers
+  if(length(K) == 3) {
+    for(i in 1:N) {
+      a <- as.vector(Estep_array[, , , i])
+      r <- exp(a - LogSumExp(a))
+      Estep_array[, , , i] <- array(r, dim = K)
+    }
+  }
+
   return(Estep_array)
 }
 
