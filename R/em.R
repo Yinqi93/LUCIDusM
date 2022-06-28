@@ -4,22 +4,32 @@
 #' @param G a matrix
 #' @param Z a list, each element is a matrix
 #' @param Y a vector
-#' @param K a vector, each element is a integer, representing number of latent 
+#' @param K a vector, each element is a integer, representing number of latent
 #' clusters corresponds to each element in Z
-#' @param modelNames 
-#' @param useY 
-#' @param init_par 
+#' @param modelNames a vector of string specifies the geometric feature of omics
+#' data. See more in ?mclust::mclustModelNames
+#' @param useY logical, if TRUE, LUCID will use the information of Y to estimate
+#' the latent cluster
+#' @param init_par To be continued. An interface to initialize EM algorithm
 #'
-#' @return
 #'
-#' @examples
-EM_lucid <- function(G, Z, Y, K, 
-                     modelNames = rep("VVV", length(K)), 
-                     useY = TRUE, 
+#' @return A list contains the object below:
+#' 1. res_Beta: estimation for G->X associations
+#' 2. res_Mu_Sigma: estimation for X->Z associations
+#' 3. res_Delta: estimation for X->Y associations
+#' 4. loglik: log likelihood of LUCID model
+#' 5. z: posterior cluster assignment for each observation
+#' 6. K: number of latent clusters
+#' 7. N: number of observations
+#'
+#' @export
+EM_lucid <- function(G, Z, Y, K,
+                     modelNames = rep("VVV", length(K)),
+                     useY = TRUE,
                      init_par = NULL,
-                     tol = 1e-3, 
+                     tol = 1e-3,
                      family = c("gaussian", "binomial"),
-                     max_itr = 1e3, 
+                     max_itr = 1e3,
                      seed = 123) {
   # check data format
   if(!is.matrix(G)) {
@@ -33,15 +43,15 @@ EM_lucid <- function(G, Z, Y, K,
   if(!is.matrix(Y)) {
     Y <- as.matrix(Y)
   }
-  
-  
+
+
   # basic setup
   N <- nrow(G)
   nOmics <- length(Z)
   nG <- ncol(G)
   nZ <- as.integer(sapply(Z, ncol))
   family <- match.arg(family)
-  
+
   # initialize model parameters
   set.seed(seed)
   Mu_Sigma <- initialize_Mu_Sigma(K = K, Z = Z, modelNames = modelNames)
@@ -53,31 +63,31 @@ EM_lucid <- function(G, Z, Y, K,
     Beta[[i]] <- coef(temp_fit)
   }
   # Beta <- initialize_Beta(K = K, nG = nG)
-  Delta <- initialize_Delta(K = K, nCoY = 0, family = family, 
+  Delta <- initialize_Delta(K = K, nCoY = 0, family = family,
                             z = Mu_Sigma$z, Y = Y)
   loglik <- -Inf
-  
+
   # start EM algorithm
   flag_converge <- FALSE
   itr <- 0
   while(!flag_converge & itr < max_itr) {
     # E-step
-    Estep_array <- Estep(G = G, Z = Z, Y = Y, 
+    Estep_array <- Estep(G = G, Z = Z, Y = Y,
                          Beta = Beta, Mu = Mu, Sigma = Sigma, Delta = Delta,
                          family = family, useY = useY)
     Estep_r <- Estep_to_r(Estep_array = Estep_array,
                           K = K,
                           N = N)
-    
+
     # M-step
     res_Beta <- Mstep_GtoX(G = G, r = Estep_r, K = K, N = N)
-    res_Mu_Sigma <- Mstep_XtoZ(Z = Z, r = Estep_r, K = K, 
+    res_Mu_Sigma <- Mstep_XtoZ(Z = Z, r = Estep_r, K = K,
                                modelNames = modelNames, N = N)
     if(useY) {
       res_Delta <- Mstep_XtoY(Y = Y, r = Estep_r, K = K, N = N,
                               family = family)
     }
-    
+
     # update parameters
     Beta <- res_Beta$Beta
     Mu <- res_Mu_Sigma$Mu
@@ -85,9 +95,9 @@ EM_lucid <- function(G, Z, Y, K,
     if(useY) {
       Delta <- res_Delta$Delta
     }
-    
-    
-    
+
+
+
     # check convergence
     loglik_update <- cal_loglik(Estep_array = Estep_array,
                                 Estep_r = Estep_r)
@@ -100,14 +110,14 @@ EM_lucid <- function(G, Z, Y, K,
       cat(paste0("iteration ", itr, ": log-likelihood = ", loglik_update, "\n"))
     }
   }
-  
-  
+
+
   if(!useY) {
     res_Delta <- Mstep_XtoY(Y = Y, r = Estep_r, K = K, N = N,
                             family = family)
     Delta <- res_Delta$Delta
   }
-  
+
   return(list(res_Beta = res_Beta,
               res_Mu_Sigma = res_Mu_Sigma,
               res_Delta = res_Delta,
