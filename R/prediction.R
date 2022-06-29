@@ -1,4 +1,16 @@
-# functions to predict 
+#' Prediction function for LUCID
+#'
+#' @param model A LUCID model returned by EM_lucid
+#' @param G matrix
+#' @param Z a list, each element is a matrix
+#' @param Y vector
+#'
+#' @return a list contains
+#' 1. predicted cluster assignment for each omic layer
+#' 2. posterior inclusion probability
+#' 3. predicted outcome
+#' @export
+#'
 predict_lucid <- function(model,
                           G = NULL,
                           Z = NULL,
@@ -24,15 +36,15 @@ predict_lucid <- function(model,
     pred_Y <- predict(model$res_Delta$fit)
   } else { # prediction of X and Y based on new data
     # predict X and Y based on G
-    
+
     # predict X and Y based on Z
-    
+
     # predict X and Y based on X and G
-    
-    # predict X and Y based 
-    
+
+    # predict X and Y based
+
   }
-  
+
   return(list(pred_X = pred_X,
               pred_z = pred_z,
               pred_Y = pred_Y))

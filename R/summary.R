@@ -17,7 +17,7 @@ reorder_Delta <- function(ref, Delta) {
   K <- Delta$K
   mu_matrix <- vec_to_array(K = K, mu = Delta$mu)
   mu <- mu_matrix[ref]
-  
+
   # if 2 omics data
   if(length(K) == 2) {
     # reorder K1
@@ -30,7 +30,7 @@ reorder_Delta <- function(ref, Delta) {
     # order of re-arranged cluster for omics 1
     k1 <- order(mu_k1)
     k1_order <- c(ref[1], k1[k1 != ref[1]])
-    
+
     # reorder K2
     mu_k2 <- rep(0, K[2])
     for(i in 1:K[2]) {
@@ -41,11 +41,11 @@ reorder_Delta <- function(ref, Delta) {
     # order of re-arranged cluster for omics 2
     k2 <- order(mu_k2)
     k2_order <- c(ref[2], k2[k2 != ref[2]])
-    
+
     K_order <- list(K1 = k1_order,
                     K2 = k2_order)
   }
-  
+
   Delta$mu <- mu
   return(list(Delta = Delta,
               K_order = K_order))
@@ -78,7 +78,7 @@ reorder_Beta <- function(Beta, K_order) {
     }
     Beta[[i]] <- temp_Beta_reorder[-1, ]
   }
-  
+
   return(Beta)
 }
 
@@ -91,12 +91,19 @@ reorder_z <- function(z, K_order) {
   return(z)
 }
 
-# function to reorder all model parameters
+
+#' function to reorder all model parameters
+#'
+#' @param model A model returned by EM_lucid
+#'
+#' @return A LUCID model reordered by effect size of outcome
+#' @export
+#'
 reorder_lucid <- function(model) {
   ref <- get_ref_cluster(Delta = model$res_Delta$Delta)
   r_Delta <- reorder_Delta(ref = ref,
                            Delta = model$res_Delta$Delta)
-  r_Mu_Sigma <- reorder_Mu_Sigma(model$res_Mu_Sigma, 
+  r_Mu_Sigma <- reorder_Mu_Sigma(model$res_Mu_Sigma,
                                  K_order = r_Delta$K_order)
   r_Beta <- reorder_Beta(Beta = model$res_Beta$Beta,
                          K_order = r_Delta$K_order)
@@ -116,7 +123,7 @@ cal_bic <- function(model) {
   Mu <- model$res_Mu_Sigma$Mu
   Sigma <- model$res_Mu_Sigma$Sigma
   Delta <- model$res_Delta$Delta
-  
+
   # calculate number of parameters
   n_Beta <- sum(sapply(1:nOmics, function(i) {
     length(Beta[[i]])
@@ -129,7 +136,7 @@ cal_bic <- function(model) {
   }))
   n_Delta <- length(Delta$mu) + 1
   n_par <- n_Beta + n_Mu + n_Sigma + n_Delta
-  
+
   # calculate BIC
   bic <- -2 * model$loglik + n_par * log(model$N)
   return(bic)
